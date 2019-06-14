@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ package org.springframework.web.servlet.mvc.method.annotation;
 
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,14 +29,16 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.springframework.context.EmbeddedValueResolverAware;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.core.annotation.MergedAnnotation;
+import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 import org.springframework.util.StringValueResolver;
 import org.springframework.web.accept.ContentNegotiationManager;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.cors.CorsConfiguration;
@@ -44,6 +47,8 @@ import org.springframework.web.servlet.handler.MatchableHandlerMapping;
 import org.springframework.web.servlet.handler.RequestMatchResult;
 import org.springframework.web.servlet.mvc.condition.AbstractRequestCondition;
 import org.springframework.web.servlet.mvc.condition.CompositeRequestCondition;
+import org.springframework.web.servlet.mvc.condition.ConsumesRequestCondition;
+import org.springframework.web.servlet.mvc.condition.ProducesRequestCondition;
 import org.springframework.web.servlet.mvc.condition.RequestCondition;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping;
@@ -67,7 +72,7 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 
 	private boolean useTrailingSlashMatch = true;
 
-	private final Map<String, Predicate<Class<?>>> pathPrefixes = new LinkedHashMap<>();
+	private Map<String, Predicate<Class<?>>> pathPrefixes = new LinkedHashMap<>();
 
 	private ContentNegotiationManager contentNegotiationManager = new ContentNegotiationManager();
 
@@ -120,10 +125,15 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 	 * @since 5.1
 	 */
 	public void setPathPrefixes(Map<String, Predicate<Class<?>>> prefixes) {
-		this.pathPrefixes.clear();
-		prefixes.entrySet().stream()
-				.filter(entry -> StringUtils.hasText(entry.getKey()))
-				.forEach(entry -> this.pathPrefixes.put(entry.getKey(), entry.getValue()));
+		this.pathPrefixes = Collections.unmodifiableMap(new LinkedHashMap<>(prefixes));
+	}
+
+	/**
+	 * The configured path prefixes as a read-only, possibly empty map.
+	 * @since 5.1
+	 */
+	public Map<String, Predicate<Class<?>>> getPathPrefixes() {
+		return this.pathPrefixes;
 	}
 
 	/**
@@ -133,6 +143,13 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 	public void setContentNegotiationManager(ContentNegotiationManager contentNegotiationManager) {
 		Assert.notNull(contentNegotiationManager, "ContentNegotiationManager must not be null");
 		this.contentNegotiationManager = contentNegotiationManager;
+	}
+
+	/**
+	 * Return the configured {@link ContentNegotiationManager}.
+	 */
+	public ContentNegotiationManager getContentNegotiationManager() {
+		return this.contentNegotiationManager;
 	}
 
 	@Override
@@ -176,21 +193,6 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 	}
 
 	/**
-	 * The configured path prefixes as a read-only, possibly empty map.
-	 * @since 5.1
-	 */
-	public Map<String, Predicate<Class<?>>> getPathPrefixes() {
-		return Collections.unmodifiableMap(this.pathPrefixes);
-	}
-
-	/**
-	 * Return the configured {@link ContentNegotiationManager}.
-	 */
-	public ContentNegotiationManager getContentNegotiationManager() {
-		return this.contentNegotiationManager;
-	}
-
-	/**
 	 * Return the file extensions to use for suffix pattern matching.
 	 */
 	@Nullable
@@ -227,18 +229,26 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 			if (typeInfo != null) {
 				info = typeInfo.combine(info);
 			}
-			for (Map.Entry<String, Predicate<Class<?>>> entry : this.pathPrefixes.entrySet()) {
-				if (entry.getValue().test(handlerType)) {
-					String prefix = entry.getKey();
-					if (this.embeddedValueResolver != null) {
-						prefix = this.embeddedValueResolver.resolveStringValue(prefix);
-					}
-					info = RequestMappingInfo.paths(prefix).build().combine(info);
-					break;
-				}
+			String prefix = getPathPrefix(handlerType);
+			if (prefix != null) {
+				info = RequestMappingInfo.paths(prefix).build().combine(info);
 			}
 		}
 		return info;
+	}
+
+	@Nullable
+	String getPathPrefix(Class<?> handlerType) {
+		for (Map.Entry<String, Predicate<Class<?>>> entry : this.pathPrefixes.entrySet()) {
+			if (entry.getValue().test(handlerType)) {
+				String prefix = entry.getKey();
+				if (this.embeddedValueResolver != null) {
+					prefix = this.embeddedValueResolver.resolveStringValue(prefix);
+				}
+				return prefix;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -329,6 +339,31 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 	}
 
 	@Override
+	public void registerMapping(RequestMappingInfo mapping, Object handler, Method method) {
+		super.registerMapping(mapping, handler, method);
+		updateConsumesCondition(mapping, method);
+	}
+
+	@Override
+	protected void registerHandlerMethod(Object handler, Method method, RequestMappingInfo mapping) {
+		super.registerHandlerMethod(handler, method, mapping);
+		updateConsumesCondition(mapping, method);
+	}
+
+	private void updateConsumesCondition(RequestMappingInfo info, Method method) {
+		ConsumesRequestCondition condition = info.getConsumesCondition();
+		if (!condition.isEmpty()) {
+			for (Parameter parameter : method.getParameters()) {
+				MergedAnnotation<RequestBody> annot = MergedAnnotations.from(parameter).get(RequestBody.class);
+				if (annot.isPresent()) {
+					condition.setBodyRequired(annot.getBoolean("required"));
+					break;
+				}
+			}
+		}
+	}
+
+	@Override
 	public RequestMatchResult match(HttpServletRequest request, String pattern) {
 		RequestMappingInfo info = RequestMappingInfo.paths(pattern).options(this.config).build();
 		RequestMappingInfo matchingInfo = info.getMatchingCondition(request);
@@ -336,7 +371,7 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 			return null;
 		}
 		Set<String> patterns = matchingInfo.getPatternsCondition().getPatterns();
-		String lookupPath = getUrlPathHelper().getLookupPathForRequest(request);
+		String lookupPath = getUrlPathHelper().getLookupPathForRequest(request, LOOKUP_PATH);
 		return new RequestMatchResult(patterns.iterator().next(), lookupPath, getPathMatcher());
 	}
 
@@ -404,6 +439,16 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 		}
 		else {
 			return value;
+		}
+	}
+
+	@Override
+	protected HandlerMethod getHandlerInternal(HttpServletRequest request) throws Exception {
+		try {
+			return super.getHandlerInternal(request);
+		}
+		finally {
+			ProducesRequestCondition.clearMediaTypesAttribute(request);
 		}
 	}
 

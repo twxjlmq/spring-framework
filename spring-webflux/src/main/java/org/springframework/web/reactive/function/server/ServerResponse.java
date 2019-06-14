@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 package org.springframework.web.reactive.function.server;
 
 import java.net.URI;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -285,6 +286,16 @@ public interface ServerResponse {
 		B lastModified(ZonedDateTime lastModified);
 
 		/**
+		 * Set the time the resource was last changed, as specified by the
+		 * {@code Last-Modified} header.
+		 * @param lastModified the last modified date
+		 * @return this builder
+		 * @since 5.1.4
+		 * @see HttpHeaders#setLastModified(long)
+		 */
+		B lastModified(Instant lastModified);
+
+		/**
 		 * Set the location of a resource, as specified by the {@code Location} header.
 		 * @param location the location
 		 * @return this builder
@@ -366,6 +377,14 @@ public interface ServerResponse {
 		BodyBuilder hint(String key, Object value);
 
 		/**
+		 * Customize the serialization hints with the given consumer.
+		 * @param hintsConsumer a function that consumes the hints
+		 * @return this builder
+		 * @since 5.1.6
+		 */
+		BodyBuilder hints(Consumer<Map<String, Object>> hintsConsumer);
+
+		/**
 		 * Set the body of the response to the given asynchronous {@code Publisher} and return it.
 		 * This convenience method combines {@link #body(BodyInserter)} and
 		 * {@link BodyInserters#fromPublisher(Publisher, Class)}.
@@ -412,9 +431,9 @@ public interface ServerResponse {
 		 * Render the template with the given {@code name} using the given {@code modelAttributes}.
 		 * The model attributes are mapped under a
 		 * {@linkplain org.springframework.core.Conventions#getVariableName generated name}.
-		 * <p><emphasis>Note: Empty {@link Collection Collections} are not added to
+		 * <p><em>Note: Empty {@link Collection Collections} are not added to
 		 * the model when using this method because we cannot correctly determine
-		 * the true convention name.</emphasis>
+		 * the true convention name.</em>
 		 * @param name the name of the template to be rendered
 		 * @param modelAttributes the modelAttributes used to render the template
 		 * @return the built response
@@ -437,13 +456,13 @@ public interface ServerResponse {
 	interface Context {
 
 		/**
-		 * Return the {@link HttpMessageWriter}s to be used for response body conversion.
+		 * Return the {@link HttpMessageWriter HttpMessageWriters} to be used for response body conversion.
 		 * @return the list of message writers
 		 */
 		List<HttpMessageWriter<?>> messageWriters();
 
 		/**
-		 * Return the  {@link ViewResolver}s to be used for view name resolution.
+		 * Return the  {@link ViewResolver ViewResolvers} to be used for view name resolution.
 		 * @return the list of view resolvers
 		 */
 		List<ViewResolver> viewResolvers();

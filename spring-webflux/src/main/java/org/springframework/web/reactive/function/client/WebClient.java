@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,21 +43,18 @@ import org.springframework.web.util.UriBuilder;
 import org.springframework.web.util.UriBuilderFactory;
 
 /**
- * A non-blocking, reactive client for performing HTTP requests with Reactive
- * Streams back pressure. Provides a higher level, common API over HTTP client
- * libraries. Reactor Netty is used by default but other clients may be plugged
- * in with a {@link ClientHttpConnector}.
+ * Non-blocking, reactive client to perform HTTP requests, exposing a fluent,
+ * reactive API over underlying HTTP client libraries such as Reactor Netty.
  *
- * <p>Use one of the static factory methods {@link #create()} or
- * {@link #create(String)} or obtain a {@link WebClient#builder()} to create an
- * instance.
+ * <p>Use static factory methods {@link #create()} or {@link #create(String)},
+ * or {@link WebClient#builder()} to prepare an instance.
  *
- * <p>For examples with a response body, see the Javadoc for:
+ * <p>For examples with a response body see:
  * <ul>
  * <li>{@link RequestHeadersSpec#retrieve() retrieve()}
  * <li>{@link RequestHeadersSpec#exchange() exchange()}
  * </ul>
- * For examples with a request body see:
+ * <p>For examples with a request body see:
  * <ul>
  * <li>{@link RequestBodySpec#body(Publisher, Class) body(Publisher,Class)}
  * <li>{@link RequestBodySpec#syncBody(Object) syncBody(Object)}
@@ -163,29 +160,29 @@ public interface WebClient {
 		/**
 		 * Configure a base URL for requests performed through the client.
 		 *
-		 * <p>For example given base URL "http://abc.com/v1":
+		 * <p>For example given base URL "https://abc.go.com/v1":
 		 * <p><pre class="code">
 		 * Mono&#060;Account&#062; result = client.get().uri("/accounts/{id}", 43)
 		 *         .retrieve()
 		 *         .bodyToMono(Account.class);
 		 *
-		 * // Result: http://abc.com/v1/accounts/43
+		 * // Result: https://abc.go.com/v1/accounts/43
 		 *
 		 * Flux&#060;Account&#062; result = client.get()
 		 *         .uri(builder -> builder.path("/accounts").queryParam("q", "12").build())
 		 *         .retrieve()
 		 *         .bodyToFlux(Account.class);
 		 *
-		 * // Result: http://abc.com/v1/accounts?q=12
+		 * // Result: https://abc.go.com/v1/accounts?q=12
 		 * </pre>
 		 *
 		 * <p>The base URL can be overridden with an absolute URI:
 		 * <pre class="code">
-		 * Mono&#060;Account&#062; result = client.get().uri("http://xyz.com/path")
+		 * Mono&#060;Account&#062; result = client.get().uri("https://xyz.com/path")
 		 *         .retrieve()
 		 *         .bodyToMono(Account.class);
 		 *
-		 * // Result: http://xyz.com/path
+		 * // Result: https://xyz.com/path
 		 * </pre>
 		 *
 		 * <p>Or partially overridden with a {@code UriBuilder}:
@@ -195,7 +192,7 @@ public interface WebClient {
 		 *         .retrieve()
 		 *         .bodyToFlux(Account.class);
 		 *
-		 * // Result: http://abc.com/v2/accounts?q=12
+		 * // Result: https://abc.com/v2/accounts?q=12
 		 * </pre>
 		 *
 		 * @see #defaultUriVariables(Map)
@@ -226,34 +223,42 @@ public interface WebClient {
 		Builder uriBuilderFactory(UriBuilderFactory uriBuilderFactory);
 
 		/**
-		 * Add the given header to all requests that have not added it.
-		 * @param headerName the header name
-		 * @param headerValues the header values
+		 * Global option to specify a header to be added to every request,
+		 * if the request does not already contain such a header.
+		 * @param header the header name
+		 * @param values the header values
 		 */
-		Builder defaultHeader(String headerName, String... headerValues);
+		Builder defaultHeader(String header, String... values);
 
 		/**
-		 * Manipulate the default headers with the given consumer. The
-		 * headers provided to the consumer are "live", so that the consumer
-		 * can be used to overwrite or remove existing values.
-		 * @param headersConsumer the headers consumer
+		 * Provides access to every {@link #defaultHeader(String, String...)}
+		 * declared so far with the possibility to add, replace, or remove.
+		 * @param headersConsumer the consumer
 		 */
 		Builder defaultHeaders(Consumer<HttpHeaders> headersConsumer);
 
 		/**
-		 * Add the given header to all requests that haven't added it.
-		 * @param cookieName the cookie name
-		 * @param cookieValues the cookie values
+		 * Global option to specify a cookie to be added to every request,
+		 * if the request does not already contain such a cookie.
+		 * @param cookie the cookie name
+		 * @param values the cookie values
 		 */
-		Builder defaultCookie(String cookieName, String... cookieValues);
+		Builder defaultCookie(String cookie, String... values);
 
 		/**
-		 * Manipulate the default cookies with the given consumer. The
-		 * cookies provided to the consumer are "live", so that the consumer
-		 * can be used to overwrite or remove existing values.
+		 * Provides access to every {@link #defaultCookie(String, String...)}
+		 * declared so far with the possibility to add, replace, or remove.
 		 * @param cookiesConsumer a function that consumes the cookies map
 		 */
 		Builder defaultCookies(Consumer<MultiValueMap<String, String>> cookiesConsumer);
+
+		/**
+		 * Provide a consumer to modify every request being built just before the
+		 * call to {@link RequestHeadersSpec#exchange() exchange()}.
+		 * @param defaultRequest the consumer to use for modifying requests
+		 * @since 5.1
+		 */
+		Builder defaultRequest(Consumer<RequestHeadersSpec<?>> defaultRequest);
 
 		/**
 		 * Add the given filter to the filter chain.
@@ -298,7 +303,7 @@ public interface WebClient {
 		Builder exchangeFunction(ExchangeFunction exchangeFunction);
 
 		/**
-		 * Clone this {@code WebClient.Builder}
+		 * Clone this {@code WebClient.Builder}.
 		 */
 		Builder clone();
 
@@ -319,6 +324,8 @@ public interface WebClient {
 
 	/**
 	 * Contract for specifying the URI for a request.
+	 *
+	 * @param <S> a self reference to the spec type
 	 */
 	interface UriSpec<S extends RequestHeadersSpec<?>> {
 
@@ -342,8 +349,15 @@ public interface WebClient {
 		S uri(String uri, Map<String, ?> uriVariables);
 
 		/**
-		 * Build the URI for the request using the {@link UriBuilderFactory}
-		 * configured for this client.
+		 * Specify the URI starting with a URI template and finishing off with a
+		 * {@link UriBuilder} created from the template.
+		 * @since 5.2
+		 */
+		S uri(String uri, Function<UriBuilder, URI> uriFunction);
+
+		/**
+		 * Specify the URI by through a {@link UriBuilder}.
+		 * @see #uri(String, Function)
 		 */
 		S uri(Function<UriBuilder, URI> uriFunction);
 	}
@@ -351,6 +365,8 @@ public interface WebClient {
 
 	/**
 	 * Contract for specifying request headers leading up to the exchange.
+	 *
+	 * @param <S> a self reference to the spec type
 	 */
 	interface RequestHeadersSpec<S extends RequestHeadersSpec<S>> {
 
@@ -379,10 +395,9 @@ public interface WebClient {
 		S cookie(String name, String value);
 
 		/**
-		 * Manipulate the default cookies with the given consumer. The
-		 * cookies provided to the consumer are "live", so that the consumer
-		 * can be used to overwrite or remove existing values.
-		 * @param cookiesConsumer a function that consumes the cookies map
+		 * Provides access to every cookie declared so far with the possibility
+		 * to add, replace, or remove values.
+		 * @param cookiesConsumer the consumer to provide access to
 		 * @return this builder
 		 */
 		S cookies(Consumer<MultiValueMap<String, String>> cookiesConsumer);
@@ -412,10 +427,9 @@ public interface WebClient {
 		S header(String headerName, String... headerValues);
 
 		/**
-		 * Manipulate the default headers with the given consumer. The
-		 * headers provided to the consumer are "live", so that the consumer
-		 * can be used to overwrite or remove existing values.
-		 * @param headersConsumer a function that consumes the {@code HttpHeaders}
+		 * Provides access to every header declared so far with the possibility
+		 * to add, replace, or remove values.
+		 * @param headersConsumer the consumer to provide access to
 		 * @return this builder
 		 */
 		S headers(Consumer<HttpHeaders> headersConsumer);
@@ -429,10 +443,9 @@ public interface WebClient {
 		S attribute(String name, Object value);
 
 		/**
-		 * Manipulate the request attributes with the given consumer. The attributes provided to
-		 * the consumer are "live", so that the consumer can be used to inspect attributes,
-		 * remove attributes, or use any of the other map-provided methods.
-		 * @param attributesConsumer a function that consumes the attributes
+		 * Provides access to every attribute declared so far with the
+		 * possibility to add, replace, or remove values.
+		 * @param attributesConsumer the consumer to provide access to
 		 * @return this builder
 		 */
 		S attributes(Consumer<Map<String, Object>> attributesConsumer);
@@ -462,13 +475,13 @@ public interface WebClient {
 		 *     .uri("/persons/1")
 		 *     .accept(MediaType.APPLICATION_JSON)
 		 *     .exchange()
-		 *     .flatMap(response -> response.bodyToMono(Person.class));
+		 *     .flatMap(response -&gt; response.bodyToMono(Person.class));
 		 *
 		 * Flux&lt;Person&gt; flux = client.get()
 		 *     .uri("/persons")
 		 *     .accept(MediaType.APPLICATION_STREAM_JSON)
 		 *     .exchange()
-		 *     .flatMapMany(response -> response.bodyToFlux(Person.class));
+		 *     .flatMapMany(response -&gt; response.bodyToFlux(Person.class));
 		 * </pre>
 		 * <p><strong>NOTE:</strong> You must always use one of the body or
 		 * entity methods of the response to ensure resources are released.
@@ -480,6 +493,9 @@ public interface WebClient {
 	}
 
 
+	/**
+	 * Contract for specifying request headers and body leading up to the exchange.
+	 */
 	interface RequestBodySpec extends RequestHeadersSpec<RequestBodySpec> {
 
 		/**
@@ -552,7 +568,7 @@ public interface WebClient {
 		 * <p><pre class="code">
 		 * Person person = ... ;
 		 *
-		 * Mono<Void> result = client.post()
+		 * Mono&lt;Void&gt; result = client.post()
 		 *     .uri("/persons/{id}", id)
 		 *     .contentType(MediaType.APPLICATION_JSON)
 		 *     .syncBody(person)
@@ -573,7 +589,9 @@ public interface WebClient {
 		RequestHeadersSpec<?> syncBody(Object body);
 	}
 
-
+	/**
+	 * Contract for specifying response operations following the exchange.
+	 */
 	interface ResponseSpec {
 
 		/**
@@ -584,6 +602,9 @@ public interface WebClient {
 		 * {@link WebClientResponseException} when the response status code is 4xx or 5xx.
 		 * @param statusPredicate a predicate that indicates whether {@code exceptionFunction}
 		 * applies
+		 * <p><strong>NOTE:</strong> if the response is expected to have content,
+		 * the exceptionFunction should consume it. If not, the content will be
+		 * automatically drained to ensure resources are released.
 		 * @param exceptionFunction the function that returns the exception
 		 * @return this builder
 		 */
@@ -637,11 +658,18 @@ public interface WebClient {
 	}
 
 
+	/**
+	 * Contract for specifying request headers and URI for a request.
+	 *
+	 * @param <S> a self reference to the spec type
+	 */
 	interface RequestHeadersUriSpec<S extends RequestHeadersSpec<S>>
 			extends UriSpec<S>, RequestHeadersSpec<S> {
 	}
 
-
+	/**
+	 * Contract for specifying request headers, body and URI for a request.
+	 */
 	interface RequestBodyUriSpec extends RequestBodySpec, RequestHeadersUriSpec<RequestBodySpec> {
 	}
 

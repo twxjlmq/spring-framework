@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,10 +46,10 @@ import org.springframework.util.PatternMatchUtils;
 public class MethodMapTransactionAttributeSource
 		implements TransactionAttributeSource, BeanClassLoaderAware, InitializingBean {
 
-	/** Logger available to subclasses */
+	/** Logger available to subclasses. */
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	/** Map from method name to attribute value */
+	/** Map from method name to attribute value. */
 	@Nullable
 	private Map<String, TransactionAttribute> methodMap;
 
@@ -60,10 +60,10 @@ public class MethodMapTransactionAttributeSource
 
 	private boolean initialized = false;
 
-	/** Map from Method to TransactionAttribute */
+	/** Map from Method to TransactionAttribute. */
 	private final Map<Method, TransactionAttribute> transactionAttributeMap = new HashMap<>();
 
-	/** Map from Method to name pattern used for registration */
+	/** Map from Method to name pattern used for registration. */
 	private final Map<Method, String> methodNameMap = new HashMap<>();
 
 
@@ -103,7 +103,7 @@ public class MethodMapTransactionAttributeSource
 
 	/**
 	 * Initialize the specified {@link #setMethodMap(java.util.Map) "methodMap"}, if any.
-	 * @param methodMap Map from method names to {@code TransactionAttribute} instances
+	 * @param methodMap a Map from method names to {@code TransactionAttribute} instances
 	 * @see #setMethodMap
 	 */
 	protected void initMethodMap(@Nullable Map<String, TransactionAttribute> methodMap) {
@@ -153,7 +153,7 @@ public class MethodMapTransactionAttributeSource
 		}
 		if (matchingMethods.isEmpty()) {
 			throw new IllegalArgumentException(
-					"Couldn't find method '" + mappedName + "' on class [" + clazz.getName() + "]");
+					"Could not find method '" + mappedName + "' on class [" + clazz.getName() + "]");
 		}
 
 		// Register all matching methods
@@ -225,7 +225,7 @@ public class MethodMapTransactionAttributeSource
 
 
 	@Override
-	public boolean equals(Object other) {
+	public boolean equals(@Nullable Object other) {
 		if (this == other) {
 			return true;
 		}

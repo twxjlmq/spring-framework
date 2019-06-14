@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,6 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
 import javax.servlet.AsyncContext;
 import javax.servlet.DispatcherType;
 import javax.servlet.RequestDispatcher;
@@ -58,6 +59,7 @@ import javax.servlet.http.Part;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.LinkedCaseInsensitiveMap;
@@ -102,7 +104,7 @@ public class MockHttpServletRequest implements HttpServletRequest {
 			new BufferedReader(new StringReader(""));
 
 	/**
-	 * Date formats as specified in the HTTP RFC
+	 * Date formats as specified in the HTTP RFC.
 	 * @see <a href="https://tools.ietf.org/html/rfc7231#section-7.1.1.1">Section 7.1.1.1 of RFC 7231</a>
 	 */
 	private static final String[] DATE_FORMATS = new String[] {
@@ -178,6 +180,12 @@ public class MockHttpServletRequest implements HttpServletRequest {
 	@Nullable
 	private String contentType;
 
+	@Nullable
+	private ServletInputStream inputStream;
+
+	@Nullable
+	private BufferedReader reader;
+
 	private final Map<String, String[]> parameters = new LinkedHashMap<>(16);
 
 	private String protocol = DEFAULT_PROTOCOL;
@@ -192,8 +200,8 @@ public class MockHttpServletRequest implements HttpServletRequest {
 
 	private String remoteHost = DEFAULT_REMOTE_HOST;
 
-	/** List of locales in descending order */
-	private final List<Locale> locales = new LinkedList<>();
+	/** List of locales in descending order. */
+	private final LinkedList<Locale> locales = new LinkedList<>();
 
 	private boolean secure = false;
 
@@ -397,12 +405,11 @@ public class MockHttpServletRequest implements HttpServletRequest {
 
 	private void updateContentTypeHeader() {
 		if (StringUtils.hasLength(this.contentType)) {
-			StringBuilder sb = new StringBuilder(this.contentType);
-			if (!this.contentType.toLowerCase().contains(CHARSET_PREFIX) &&
-					StringUtils.hasLength(this.characterEncoding)) {
-				sb.append(";").append(CHARSET_PREFIX).append(this.characterEncoding);
+			String value = this.contentType;
+			if (StringUtils.hasLength(this.characterEncoding) && !this.contentType.toLowerCase().contains(CHARSET_PREFIX)) {
+				value += ';' + CHARSET_PREFIX + this.characterEncoding;
 			}
-			doAddHeaderValue(HttpHeaders.CONTENT_TYPE, sb.toString(), true);
+			doAddHeaderValue(HttpHeaders.CONTENT_TYPE, value, true);
 		}
 	}
 
@@ -417,6 +424,8 @@ public class MockHttpServletRequest implements HttpServletRequest {
 	 */
 	public void setContent(@Nullable byte[] content) {
 		this.content = content;
+		this.inputStream = null;
+		this.reader = null;
 	}
 
 	/**
@@ -492,12 +501,18 @@ public class MockHttpServletRequest implements HttpServletRequest {
 
 	@Override
 	public ServletInputStream getInputStream() {
-		if (this.content != null) {
-			return new DelegatingServletInputStream(new ByteArrayInputStream(this.content));
+		if (this.inputStream != null) {
+			return this.inputStream;
 		}
-		else {
-			return EMPTY_SERVLET_INPUT_STREAM;
+		else if (this.reader != null) {
+			throw new IllegalStateException(
+					"Cannot call getInputStream() after getReader() has already been called for the current request")			;
 		}
+
+		this.inputStream = (this.content != null ?
+				new DelegatingServletInputStream(new ByteArrayInputStream(this.content)) :
+				EMPTY_SERVLET_INPUT_STREAM);
+		return this.inputStream;
 	}
 
 	/**
@@ -569,7 +584,7 @@ public class MockHttpServletRequest implements HttpServletRequest {
 	}
 
 	/**
-	 * Adds all provided parameters <strong>without</strong> replacing any
+	 * Add all provided parameters <strong>without</strong> replacing any
 	 * existing values. To replace existing values, use
 	 * {@link #setParameters(java.util.Map)}.
 	 */
@@ -598,7 +613,7 @@ public class MockHttpServletRequest implements HttpServletRequest {
 	}
 
 	/**
-	 * Removes all existing parameters.
+	 * Remove all existing parameters.
 	 */
 	public void removeAllParameters() {
 		this.parameters.clear();
@@ -695,16 +710,25 @@ public class MockHttpServletRequest implements HttpServletRequest {
 
 	@Override
 	public BufferedReader getReader() throws UnsupportedEncodingException {
+		if (this.reader != null) {
+			return this.reader;
+		}
+		else if (this.inputStream != null) {
+			throw new IllegalStateException(
+					"Cannot call getReader() after getInputStream() has already been called for the current request")			;
+		}
+
 		if (this.content != null) {
 			InputStream sourceStream = new ByteArrayInputStream(this.content);
 			Reader sourceReader = (this.characterEncoding != null) ?
 					new InputStreamReader(sourceStream, this.characterEncoding) :
 					new InputStreamReader(sourceStream);
-			return new BufferedReader(sourceReader);
+			this.reader = new BufferedReader(sourceReader);
 		}
 		else {
-			return EMPTY_BUFFERED_READER;
+			this.reader = EMPTY_BUFFERED_READER;
 		}
+		return this.reader;
 	}
 
 	public void setRemoteAddr(String remoteAddr) {
@@ -757,15 +781,15 @@ public class MockHttpServletRequest implements HttpServletRequest {
 	 */
 	public void addPreferredLocale(Locale locale) {
 		Assert.notNull(locale, "Locale must not be null");
-		this.locales.add(0, locale);
+		this.locales.addFirst(locale);
 		updateAcceptLanguageHeader();
 	}
 
 	/**
 	 * Set the list of preferred locales, in descending order, effectively replacing
 	 * any existing locales.
-	 * @see #addPreferredLocale
 	 * @since 3.2
+	 * @see #addPreferredLocale
 	 */
 	public void setPreferredLocales(List<Locale> locales) {
 		Assert.notEmpty(locales, "Locale list must not be empty");
@@ -795,7 +819,7 @@ public class MockHttpServletRequest implements HttpServletRequest {
 	 */
 	@Override
 	public Locale getLocale() {
-		return this.locales.get(0);
+		return this.locales.getFirst();
 	}
 
 	/**
@@ -951,12 +975,18 @@ public class MockHttpServletRequest implements HttpServletRequest {
 
 	public void setCookies(@Nullable Cookie... cookies) {
 		this.cookies = (ObjectUtils.isEmpty(cookies) ? null : cookies);
-		this.headers.remove(HttpHeaders.COOKIE);
-		if (this.cookies != null) {
-			Arrays.stream(this.cookies)
-					.map(c -> c.getName() + '=' + (c.getValue() == null ? "" : c.getValue()))
-					.forEach(value -> doAddHeaderValue(HttpHeaders.COOKIE, value, false));
+		if (this.cookies == null) {
+			removeHeader(HttpHeaders.COOKIE);
 		}
+		else {
+			doAddHeaderValue(HttpHeaders.COOKIE, encodeCookies(this.cookies), true);
+		}
+	}
+
+	private static String encodeCookies(@NonNull Cookie... cookies) {
+		return Arrays.stream(cookies)
+				.map(c -> c.getName() + '=' + (c.getValue() == null ? "" : c.getValue()))
+				.collect(Collectors.joining("; "));
 	}
 
 	@Override
@@ -966,9 +996,9 @@ public class MockHttpServletRequest implements HttpServletRequest {
 	}
 
 	/**
-	 * Add a header entry for the given name.
-	 * <p>While this method can take any {@code Object} as a parameter, it
-	 * is recommended to use the following types:
+	 * Add an HTTP header entry for the given name.
+	 * <p>While this method can take any {@code Object} as a parameter,
+	 * it is recommended to use the following types:
 	 * <ul>
 	 * <li>String or any Object to be converted using {@code toString()}; see {@link #getHeader}.</li>
 	 * <li>String, Number, or Date for date headers; see {@link #getDateHeader}.</li>
@@ -990,12 +1020,17 @@ public class MockHttpServletRequest implements HttpServletRequest {
 			try {
 				HttpHeaders headers = new HttpHeaders();
 				headers.add(HttpHeaders.ACCEPT_LANGUAGE, value.toString());
-				setPreferredLocales(headers.getAcceptLanguageAsLocales());
+				List<Locale> locales = headers.getAcceptLanguageAsLocales();
+				this.locales.clear();
+				this.locales.addAll(locales);
+				if (this.locales.isEmpty()) {
+					this.locales.add(Locale.ENGLISH);
+				}
 			}
 			catch (IllegalArgumentException ex) {
-				// Invalid Accept-Language format -> store plain header instead
-				doAddHeaderValue(name, value, true);
+				// Invalid Accept-Language format -> just store plain header
 			}
+			doAddHeaderValue(name, value, true);
 		}
 		else {
 			doAddHeaderValue(name, value, false);
@@ -1018,6 +1053,15 @@ public class MockHttpServletRequest implements HttpServletRequest {
 		else {
 			header.addValue(value);
 		}
+	}
+
+	/**
+	 * Remove already registered entries for the specified HTTP header, if any.
+	 * @since 4.3.20
+	 */
+	public void removeHeader(String name) {
+		Assert.notNull(name, "Header name must not be null");
+		this.headers.remove(name);
 	}
 
 	/**
@@ -1261,10 +1305,11 @@ public class MockHttpServletRequest implements HttpServletRequest {
 	 * Otherwise it simply returns the current session id.
 	 * @since 4.0.3
 	 */
+	@Override
 	public String changeSessionId() {
 		Assert.isTrue(this.session != null, "The request does not have a session");
 		if (this.session instanceof MockHttpSession) {
-			return ((MockHttpSession) session).changeSessionId();
+			return ((MockHttpSession) this.session).changeSessionId();
 		}
 		return this.session.getId();
 	}

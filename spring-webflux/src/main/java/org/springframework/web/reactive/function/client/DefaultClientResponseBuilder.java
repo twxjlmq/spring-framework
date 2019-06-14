@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -129,9 +129,14 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 
 	@Override
 	public ClientResponse build() {
-		ClientHttpResponse clientHttpResponse = new BuiltClientHttpResponse(
-				this.statusCode, this.headers, this.cookies, this.body);
-		return new DefaultClientResponse(clientHttpResponse, this.strategies);
+
+		ClientHttpResponse httpResponse =
+				new BuiltClientHttpResponse(this.statusCode, this.headers, this.cookies, this.body);
+
+		// When building ClientResponse manually, the ClientRequest.logPrefix() has to be passed,
+		// e.g. via ClientResponse.Builder, but this (builder) is not used currently.
+
+		return new DefaultClientResponse(httpResponse, this.strategies, "", "");
 	}
 
 

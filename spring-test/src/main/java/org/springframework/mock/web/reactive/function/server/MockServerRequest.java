@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -63,7 +63,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * @author Arjen Poutsma
  * @since 5.0
  */
-public class MockServerRequest implements ServerRequest {
+public final class MockServerRequest implements ServerRequest {
 
 	private final HttpMethod method;
 
@@ -293,6 +293,7 @@ public class MockServerRequest implements ServerRequest {
 		Builder session(WebSession session);
 
 		/**
+		 * Sets the request {@link Principal}.
 		 * @deprecated in favor of {@link #principal(Principal)}
 		 */
 		@Deprecated

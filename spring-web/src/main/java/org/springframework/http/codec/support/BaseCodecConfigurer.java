@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,6 @@ import org.springframework.http.codec.DecoderHttpMessageReader;
 import org.springframework.http.codec.EncoderHttpMessageWriter;
 import org.springframework.http.codec.HttpMessageReader;
 import org.springframework.http.codec.HttpMessageWriter;
-import org.springframework.http.codec.multipart.MultipartHttpMessageWriter;
 import org.springframework.util.Assert;
 
 /**
@@ -73,11 +72,11 @@ class BaseCodecConfigurer implements CodecConfigurer {
 	public List<HttpMessageReader<?>> getReaders() {
 		List<HttpMessageReader<?>> result = new ArrayList<>();
 
-		result.addAll(this.defaultCodecs.getTypedReaders());
 		result.addAll(this.customCodecs.getTypedReaders());
+		result.addAll(this.defaultCodecs.getTypedReaders());
 
-		result.addAll(this.defaultCodecs.getObjectReaders());
 		result.addAll(this.customCodecs.getObjectReaders());
+		result.addAll(this.defaultCodecs.getObjectReaders());
 
 		result.addAll(this.defaultCodecs.getCatchAllReaders());
 		return result;
@@ -97,11 +96,11 @@ class BaseCodecConfigurer implements CodecConfigurer {
 	protected List<HttpMessageWriter<?>> getWritersInternal(boolean forMultipart) {
 		List<HttpMessageWriter<?>> result = new ArrayList<>();
 
-		result.addAll(this.defaultCodecs.getTypedWriters(forMultipart));
 		result.addAll(this.customCodecs.getTypedWriters());
+		result.addAll(this.defaultCodecs.getTypedWriters(forMultipart));
 
-		result.addAll(this.defaultCodecs.getObjectWriters(forMultipart));
 		result.addAll(this.customCodecs.getObjectWriters());
+		result.addAll(this.defaultCodecs.getObjectWriters(forMultipart));
 
 		result.addAll(this.defaultCodecs.getCatchAllWriters());
 		return result;

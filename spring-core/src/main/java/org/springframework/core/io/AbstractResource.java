@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 
 import org.springframework.core.NestedIOException;
+import org.springframework.core.log.LogAccessor;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ResourceUtils;
 
@@ -39,9 +40,12 @@ import org.springframework.util.ResourceUtils;
  * throw an exception; and "toString" will return the description.
  *
  * @author Juergen Hoeller
+ * @author Sam Brannen
  * @since 28.12.2003
  */
 public abstract class AbstractResource implements Resource {
+
+	private static final LogAccessor logAccessor = new LogAccessor(AbstractResource.class);
 
 	/**
 	 * This implementation checks whether a File can be opened,
@@ -61,6 +65,8 @@ public abstract class AbstractResource implements Resource {
 				return true;
 			}
 			catch (Throwable isEx) {
+				logAccessor.debug(ex,
+						() -> "Could not close InputStream for resource: " + getDescription());
 				return false;
 			}
 		}
@@ -146,7 +152,7 @@ public abstract class AbstractResource implements Resource {
 		InputStream is = getInputStream();
 		try {
 			long size = 0;
-			byte[] buf = new byte[255];
+			byte[] buf = new byte[256];
 			int read;
 			while ((read = is.read(buf)) != -1) {
 				size += read;
@@ -158,6 +164,8 @@ public abstract class AbstractResource implements Resource {
 				is.close();
 			}
 			catch (IOException ex) {
+				logAccessor.debug(ex,
+						() -> "Could not close InputStream for resource: " + getDescription());
 			}
 		}
 	}
@@ -169,10 +177,11 @@ public abstract class AbstractResource implements Resource {
 	 */
 	@Override
 	public long lastModified() throws IOException {
-		long lastModified = getFileForLastModifiedCheck().lastModified();
-		if (lastModified == 0L) {
+		File fileToCheck = getFileForLastModifiedCheck();
+		long lastModified = fileToCheck.lastModified();
+		if (lastModified == 0L && !fileToCheck.exists()) {
 			throw new FileNotFoundException(getDescription() +
-					" cannot be resolved in the file system for resolving its last-modified timestamp");
+					" cannot be resolved in the file system for checking its last-modified timestamp");
 		}
 		return lastModified;
 	}
@@ -210,22 +219,13 @@ public abstract class AbstractResource implements Resource {
 
 
 	/**
-	 * This implementation returns the description of this resource.
-	 * @see #getDescription()
-	 */
-	@Override
-	public String toString() {
-		return getDescription();
-	}
-
-	/**
 	 * This implementation compares description strings.
 	 * @see #getDescription()
 	 */
 	@Override
-	public boolean equals(Object obj) {
-		return (obj == this ||
-			(obj instanceof Resource && ((Resource) obj).getDescription().equals(getDescription())));
+	public boolean equals(@Nullable Object other) {
+		return (this == other || (other instanceof Resource &&
+				((Resource) other).getDescription().equals(getDescription())));
 	}
 
 	/**
@@ -235,6 +235,15 @@ public abstract class AbstractResource implements Resource {
 	@Override
 	public int hashCode() {
 		return getDescription().hashCode();
+	}
+
+	/**
+	 * This implementation returns the description of this resource.
+	 * @see #getDescription()
+	 */
+	@Override
+	public String toString() {
+		return getDescription();
 	}
 
 }

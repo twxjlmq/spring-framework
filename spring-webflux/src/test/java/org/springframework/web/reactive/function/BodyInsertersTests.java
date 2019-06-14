@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 
 package org.springframework.web.reactive.function;
 
+import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -43,6 +44,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.core.io.buffer.support.DataBufferTestUtils;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpRange;
 import org.springframework.http.ReactiveHttpOutputMessage;
@@ -65,8 +67,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.Matchers.containsString;
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.codec.json.Jackson2CodecSupport.JSON_VIEW_HINT;
 
 /**
@@ -99,12 +100,10 @@ public class BodyInsertersTests {
 			public List<HttpMessageWriter<?>> messageWriters() {
 				return messageWriters;
 			}
-
 			@Override
 			public Optional<ServerHttpRequest> serverRequest() {
 				return Optional.empty();
 			}
-
 			@Override
 			public Map<String, Object> hints() {
 				return hints;
@@ -115,23 +114,24 @@ public class BodyInsertersTests {
 
 
 	@Test
-	public void ofString() throws Exception {
+	public void ofString() {
 		String body = "foo";
 		BodyInserter<String, ReactiveHttpOutputMessage> inserter = BodyInserters.fromObject(body);
 
 		MockServerHttpResponse response = new MockServerHttpResponse();
 		Mono<Void> result = inserter.insert(response, this.context);
 		StepVerifier.create(result).expectComplete().verify();
-
-		DataBuffer buffer = new DefaultDataBufferFactory().wrap(body.getBytes(UTF_8));
 		StepVerifier.create(response.getBody())
-				.expectNext(buffer)
+				.consumeNextWith(buf -> {
+					String actual = DataBufferTestUtils.dumpString(buf, UTF_8);
+					assertThat(actual).isEqualTo("foo");
+				})
 				.expectComplete()
 				.verify();
 	}
 
 	@Test
-	public void ofObject() throws Exception {
+	public void ofObject() {
 		User body = new User("foo", "bar");
 		BodyInserter<User, ReactiveHttpOutputMessage> inserter = BodyInserters.fromObject(body);
 		MockServerHttpResponse response = new MockServerHttpResponse();
@@ -145,7 +145,7 @@ public class BodyInsertersTests {
 	}
 
 	@Test
-	public void ofObjectWithHints() throws Exception {
+	public void ofObjectWithHints() {
 		User body = new User("foo", "bar");
 		BodyInserter<User, ReactiveHttpOutputMessage> inserter = BodyInserters.fromObject(body);
 		this.hints.put(JSON_VIEW_HINT, SafeToSerialize.class);
@@ -160,24 +160,24 @@ public class BodyInsertersTests {
 	}
 
 	@Test
-	public void ofPublisher() throws Exception {
+	public void ofPublisher() {
 		Flux<String> body = Flux.just("foo");
 		BodyInserter<Flux<String>, ReactiveHttpOutputMessage> inserter = BodyInserters.fromPublisher(body, String.class);
 
 		MockServerHttpResponse response = new MockServerHttpResponse();
 		Mono<Void> result = inserter.insert(response, this.context);
 		StepVerifier.create(result).expectComplete().verify();
-
-		ByteBuffer byteBuffer = ByteBuffer.wrap("foo".getBytes(UTF_8));
-		DataBuffer buffer = new DefaultDataBufferFactory().wrap(byteBuffer);
 		StepVerifier.create(response.getBody())
-				.expectNext(buffer)
+				.consumeNextWith(buf -> {
+					String actual = DataBufferTestUtils.dumpString(buf, UTF_8);
+					assertThat(actual).isEqualTo("foo");
+				})
 				.expectComplete()
 				.verify();
 	}
 
 	@Test
-	public void ofResource() throws Exception {
+	public void ofResource() throws IOException {
 		Resource body = new ClassPathResource("response.txt", getClass());
 		BodyInserter<Resource, ReactiveHttpOutputMessage> inserter = BodyInserters.fromResource(body);
 
@@ -192,14 +192,14 @@ public class BodyInsertersTests {
 					byte[] resultBytes = new byte[dataBuffer.readableByteCount()];
 					dataBuffer.read(resultBytes);
 					DataBufferUtils.release(dataBuffer);
-					assertArrayEquals(expectedBytes, resultBytes);
+					assertThat(resultBytes).isEqualTo(expectedBytes);
 				})
 				.expectComplete()
 				.verify();
 	}
 
 	@Test
-	public void ofResourceRange() throws Exception {
+	public void ofResourceRange() throws IOException {
 		final int rangeStart = 10;
 		Resource body = new ClassPathResource("response.txt", getClass());
 		BodyInserter<Resource, ReactiveHttpOutputMessage> inserter = BodyInserters.fromResource(body);
@@ -235,14 +235,14 @@ public class BodyInsertersTests {
 					byte[] resultBytes = new byte[dataBuffer.readableByteCount()];
 					dataBuffer.read(resultBytes);
 					DataBufferUtils.release(dataBuffer);
-					assertArrayEquals(expectedBytes, resultBytes);
+					assertThat(resultBytes).isEqualTo(expectedBytes);
 				})
 				.expectComplete()
 				.verify();
 	}
 
 	@Test
-	public void ofServerSentEventFlux() throws Exception {
+	public void ofServerSentEventFlux() {
 		ServerSentEvent<String> event = ServerSentEvent.builder("foo").build();
 		Flux<ServerSentEvent<String>> body = Flux.just(event);
 		BodyInserter<Flux<ServerSentEvent<String>>, ServerHttpResponse> inserter =
@@ -254,7 +254,7 @@ public class BodyInsertersTests {
 	}
 
 	@Test
-	public void fromFormDataMap() throws Exception {
+	public void fromFormDataMap() {
 		MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
 		body.set("name 1", "value 1");
 		body.add("name 2", "value 2+1");
@@ -264,7 +264,7 @@ public class BodyInsertersTests {
 		BodyInserter<MultiValueMap<String, String>, ClientHttpRequest>
 				inserter = BodyInserters.fromFormData(body);
 
-		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET, URI.create("http://example.com"));
+		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET, URI.create("https://example.com"));
 		Mono<Void> result = inserter.insert(request, this.context);
 		StepVerifier.create(result).expectComplete().verify();
 
@@ -273,8 +273,7 @@ public class BodyInsertersTests {
 					byte[] resultBytes = new byte[dataBuffer.readableByteCount()];
 					dataBuffer.read(resultBytes);
 					DataBufferUtils.release(dataBuffer);
-					assertArrayEquals("name+1=value+1&name+2=value+2%2B1&name+2=value+2%2B2&name+3".getBytes(StandardCharsets.UTF_8),
-							resultBytes);
+					assertThat(resultBytes).isEqualTo("name+1=value+1&name+2=value+2%2B1&name+2=value+2%2B2&name+3".getBytes(StandardCharsets.UTF_8));
 				})
 				.expectComplete()
 				.verify();
@@ -282,14 +281,14 @@ public class BodyInsertersTests {
 	}
 
 	@Test
-	public void fromFormDataWith() throws Exception {
+	public void fromFormDataWith() {
 		BodyInserter<MultiValueMap<String, String>, ClientHttpRequest>
 				inserter = BodyInserters.fromFormData("name 1", "value 1")
 				.with("name 2", "value 2+1")
 				.with("name 2", "value 2+2")
 				.with("name 3", null);
 
-		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET, URI.create("http://example.com"));
+		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET, URI.create("https://example.com"));
 		Mono<Void> result = inserter.insert(request, this.context);
 		StepVerifier.create(result).expectComplete().verify();
 
@@ -298,8 +297,7 @@ public class BodyInsertersTests {
 					byte[] resultBytes = new byte[dataBuffer.readableByteCount()];
 					dataBuffer.read(resultBytes);
 					DataBufferUtils.release(dataBuffer);
-					assertArrayEquals("name+1=value+1&name+2=value+2%2B1&name+2=value+2%2B2&name+3".getBytes(StandardCharsets.UTF_8),
-							resultBytes);
+					assertThat(resultBytes).isEqualTo("name+1=value+1&name+2=value+2%2B1&name+2=value+2%2B2&name+3".getBytes(StandardCharsets.UTF_8));
 				})
 				.expectComplete()
 				.verify();
@@ -307,7 +305,7 @@ public class BodyInsertersTests {
 	}
 
 	@Test
-	public void fromMultipartData() throws Exception {
+	public void fromMultipartData() {
 		MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
 		map.set("name 3", "value 3");
 
@@ -316,19 +314,19 @@ public class BodyInsertersTests {
 						.withPublisher("name 2", Flux.just("foo", "bar", "baz"), String.class)
 						.with(map);
 
-		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET, URI.create("http://example.com"));
+		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET, URI.create("https://example.com"));
 		Mono<Void> result = inserter.insert(request, this.context);
 		StepVerifier.create(result).expectComplete().verify();
 
 	}
 
-	@Test // SPR-16350
+	@Test  // SPR-16350
 	public void fromMultipartDataWithMultipleValues() {
 		MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
 		map.put("name", Arrays.asList("value1", "value2"));
 		BodyInserters.FormInserter<Object> inserter = BodyInserters.fromMultipartData(map);
 
-		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET, URI.create("http://example.com"));
+		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET, URI.create("https://example.com"));
 		Mono<Void> result = inserter.insert(request, this.context);
 		StepVerifier.create(result).expectComplete().verify();
 
@@ -338,21 +336,23 @@ public class BodyInsertersTests {
 					dataBuffer.read(resultBytes);
 					DataBufferUtils.release(dataBuffer);
 					String content = new String(resultBytes, StandardCharsets.UTF_8);
-					assertThat(content, containsString("Content-Disposition: form-data; name=\"name\"\r\n" +
+					assertThat(content).contains("Content-Disposition: form-data; name=\"name\"\r\n" +
 							"Content-Type: text/plain;charset=UTF-8\r\n" +
+							"Content-Length: 6\r\n" +
 							"\r\n" +
-							"value1"));
-					assertThat(content, containsString("Content-Disposition: form-data; name=\"name\"\r\n" +
+							"value1");
+					assertThat(content).contains("Content-Disposition: form-data; name=\"name\"\r\n" +
 							"Content-Type: text/plain;charset=UTF-8\r\n" +
+							"Content-Length: 6\r\n" +
 							"\r\n" +
-							"value2"));
+							"value2");
 				})
 				.expectComplete()
 				.verify();
 	}
 
 	@Test
-	public void ofDataBuffers() throws Exception {
+	public void ofDataBuffers() {
 		DefaultDataBufferFactory factory = new DefaultDataBufferFactory();
 		DefaultDataBuffer dataBuffer =
 				factory.wrap(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8)));

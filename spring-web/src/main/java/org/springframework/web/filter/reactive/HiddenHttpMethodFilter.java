@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,7 +52,7 @@ public class HiddenHttpMethodFilter implements WebFilter {
 			Collections.unmodifiableList(Arrays.asList(HttpMethod.PUT,
 					HttpMethod.DELETE, HttpMethod.PATCH));
 
-	/** Default name of the form parameter with the HTTP method to use */
+	/** Default name of the form parameter with the HTTP method to use. */
 	public static final String DEFAULT_METHOD_PARAMETER_NAME = "_method";
 
 
@@ -70,8 +70,7 @@ public class HiddenHttpMethodFilter implements WebFilter {
 
 
 	/**
-	 * Transform an HTTP POST into another method based on {@code methodParamName}
-	 *
+	 * Transform an HTTP POST into another method based on {@code methodParamName}.
 	 * @param exchange the current server exchange
 	 * @param chain provides a way to delegate to the next filter
 	 * @return {@code Mono<Void>} to indicate when request processing is complete

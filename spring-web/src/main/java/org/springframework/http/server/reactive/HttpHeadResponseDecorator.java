@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,6 +33,7 @@ import org.springframework.core.io.buffer.DataBufferUtils;
  */
 public class HttpHeadResponseDecorator extends ServerHttpResponseDecorator {
 
+
 	public HttpHeadResponseDecorator(ServerHttpResponse delegate) {
 		super(delegate);
 	}
@@ -45,16 +46,14 @@ public class HttpHeadResponseDecorator extends ServerHttpResponseDecorator {
 	 */
 	@Override
 	public final Mono<Void> writeWith(Publisher<? extends DataBuffer> body) {
-		// After Reactor Netty #171 is fixed we can return without delegating
-		return getDelegate().writeWith(
-				Flux.from(body)
-						.reduce(0, (current, buffer) -> {
-							int next = current + buffer.readableByteCount();
-							DataBufferUtils.release(buffer);
-							return next;
-						})
-						.doOnNext(count -> getHeaders().setContentLength(count))
-						.then(Mono.empty()));
+		return Flux.from(body)
+				.reduce(0, (current, buffer) -> {
+					int next = current + buffer.readableByteCount();
+					DataBufferUtils.release(buffer);
+					return next;
+				})
+				.doOnNext(count -> getHeaders().setContentLength(count))
+				.then();
 	}
 
 	/**
